@@ -18,11 +18,10 @@ const isMonitoredAddress = (address) => {
     return monitoredAddresses.includes(address);
 };
 
-let allEvents = [];
 const getEvents = async () => {
     const latestBlock = await provider.getBlockNumber();
     let currentBlock = latestBlock;
-    while (allEvents.length < 10001) {
+    while (monitoredAddresses.length < 10000) {
         const fromBlock = Math.max(currentBlock - 100, 0);
         const toBlock = currentBlock;
 
@@ -36,12 +35,11 @@ const getEvents = async () => {
 
         events.forEach(log => {
             let sender = `0x${log.topics[1].slice(26)}`
-            allEvents = [sender, ...allEvents];
+            monitoredAddresses = [sender, ...monitoredAddresses];
         })
 
-        if (allEvents.length >= 10000 || fromBlock <= 0 ) {
-            allEvents = allEvents.slice(0, 10000);
-            monitoredAddresses = allEvents
+        if (monitoredAddresses.length >= 10000 || fromBlock <= 0 ) {
+            monitoredAddresses = monitoredAddresses.slice(0, 10000);            
             break;
         }
 
@@ -51,7 +49,7 @@ const getEvents = async () => {
 }
 
 getEvents().then(() => {
-    console.log("monitoredAddresses", monitoredAddresses)
+    console.log("monitoredAddresses", monitoredAddresses.length)
     // Subscribe to Transfer events of the token
     tokenContract.on("Transfer", async (from, to, value, event) => {
         if (isMonitoredAddress(from.toLowerCase()) || isMonitoredAddress(to.toLowerCase())) {
