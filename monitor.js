@@ -10,38 +10,63 @@ const tokenABI = [{ "constant": true, "inputs": [], "name": "name", "outputs": [
 // Initialize token contract
 const tokenContract = new ethers.Contract(tokenContractAddress, tokenABI, provider);
 
-// List of 10,000 Ethereum addresses to monitor (example)
-const monitoredAddresses = new Set([
-    '0x28C6c06298d514Db089934071355E5743bf21d60',
-    '0x56Eddb7aa87536c09CCc2793473599fD21A8b17F',
-    '0x9696f59E4d72E237BE84fFD425DCaD154Bf96976',
-    '0x74dEc05E5b894b0EfEc69Cdf6316971802A2F9a1',
-    '0x89e51fA8CA5D66cd220bAed62ED01e8951aa7c40',
-    '0x5041ed759Dd4aFc3a72b8192C143F72f4724081A'
-    // add your wallet address
-]);
+
+let monitoredAddresses = [];
 
 // Function to check if the address is in the monitored list
 const isMonitoredAddress = (address) => {
-    return monitoredAddresses.has(address);
+    return monitoredAddresses.includes(address);
 };
 
+let allEvents = [];
+const getEvents = async () => {
+    const latestBlock = await provider.getBlockNumber();
+    let currentBlock = latestBlock;
+    while (allEvents.length < 10001) {
+        const fromBlock = Math.max(currentBlock - 100, 0);
+        const toBlock = currentBlock;
 
-// Subscribe to Transfer events of the token
-tokenContract.on("Transfer", async (from, to, value, event) => {    
-    if (isMonitoredAddress(from) || isMonitoredAddress(to)) {
-        const block = await provider.getBlock(event.blockNumber);
-        const timestamp = new Date(block.timestamp * 1000); 
+        console.log("fromBlock",fromBlock,"toblock",toBlock)
 
-        // Log the captured details
-        console.log({
-            transactionHash: event.log.transactionHash,  // Transaction hash
-            sender: from, // Sender address
-            receiver: to, // Receiver address
-            token: tokenContractAddress, // Token contract address
-            amount: ethers.formatUnits(value,6), // Token amount, assuming 6 decimals
-            timestamp: timestamp // Block timestamp
-        });
+        const events = await tokenContract.queryFilter(
+            tokenContract.filters.Transfer(),
+            fromBlock,
+            toBlock
+        );
+
+        events.forEach(log => {
+            let sender = `0x${log.topics[1].slice(26)}`
+            allEvents = [sender, ...allEvents];
+        })
+
+        if (allEvents.length >= 10000 || fromBlock <= 0 ) {
+            allEvents = allEvents.slice(0, 10000);
+            monitoredAddresses = allEvents
+            break;
+        }
+
+        currentBlock = fromBlock - 1;
     }
-})
+
+}
+
+getEvents().then(() => {
+    console.log("monitoredAddresses", monitoredAddresses)
+    // Subscribe to Transfer events of the token
+    tokenContract.on("Transfer", async (from, to, value, event) => {
+        if (isMonitoredAddress(from.toLowerCase()) || isMonitoredAddress(to.toLowerCase())) {
+            const block = await provider.getBlock(event.blockNumber);
+            const timestamp = new Date(block.timestamp * 1000);
+            // Log the captured details
+            console.log({
+                transactionHash: event.log.transactionHash,  // Transaction hash
+                sender: from, // Sender address
+                receiver: to, // Receiver address
+                token: tokenContractAddress, // Token contract address
+                amount: ethers.formatUnits(value, 6), // Token amount, assuming 6 decimals
+                timestamp: timestamp // Block timestamp
+            });
+        }
+    })
+});
 console.log('Monitoring token transfers...');
