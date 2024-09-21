@@ -49,7 +49,7 @@ const getEvents = async () => {
 }
 
 getEvents().then(() => {
-    console.log("monitoredAddresses", monitoredAddresses.length)
+    console.log("monitoredAddresses", monitoredAddresses)
     // Subscribe to Transfer events of the token
     tokenContract.on("Transfer", async (from, to, value, event) => {
         if (isMonitoredAddress(from.toLowerCase()) || isMonitoredAddress(to.toLowerCase())) {
